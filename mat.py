@@ -2,9 +2,9 @@ import random
 import re
 
 # ==========================================
-# 1. ЖЕСТКИЕ РЕГУЛЯРКИ (ЛОВЯТ ВСЕ ФОРМЫ)
+# 1. РЕГУЛЯРКА (ЛОВИТ ВСЕ ФОРМЫ МАТА)
 # ==========================================
-# Ищем корни мата в любом месте слова, игнорируя регистр
+# Ищет корни мата в любом месте слова, игнорируя регистр и букву "ё"
 MAT_PATTERN = re.compile(
     r"(хуй|хуя|хую|хуё|хуе|хуи|хуйн|хуев|хуёв|нахуй|похуй|охуе|ахуе|хуйл|хуепл|хуйло|хуйня|"
     r"пизд|пизж|пизда|пиздец|распиздяй|пиздюк|пиздабол|"
@@ -59,7 +59,7 @@ MAT_PATTERN = re.compile(
 )
 
 # ==========================================
-# 2. ГЕНЕРАТОР ОСКОРБЛЕНИЙ
+# 2. ГЕНЕРАТОР ОТВЕТОВ
 # ==========================================
 PREFIXES = [
     "{name}, ты", "Эй, {name},", "{name}, слушай сюда,", "Слышь, {name},",
@@ -129,13 +129,14 @@ TAILS = [
 def is_mat(text: str) -> bool:
     if not text:
         return False
-    # Убираем ё, чтобы ловить и "еб" и "ёб"
+    # Заменяем ё на е, чтобы регулярка ловила "ёб" как "еб"
     text = text.lower().replace("ё", "е")
     return bool(MAT_PATTERN.search(text))
 
 def make_reply(name: str) -> str:
     prefix = random.choice(PREFIXES).format(name=name)
     noun = random.choice(NOUNS)
+    # 60% шанс добавить дополнительное унижение
     extension = random.choice(INSULT_EXTENSIONS) if random.random() > 0.4 else ""
     action = random.choice(ACTIONS)
     tail = random.choice(TAILS)
