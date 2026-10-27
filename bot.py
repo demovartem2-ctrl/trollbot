@@ -8,12 +8,19 @@ from aiogram.client.telegram import TelegramAPIServer
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 from aiogram.enums import ChatType
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 
 from mat import is_mat, make_reply
 
-# Берем токен из настроек Render
 TOKEN = os.environ.get("BOT_TOKEN")
 API_BASE = os.environ.get("API_BASE", "https://misugram.cloud-ip.cc")
+
+# Render сам подставляет сюда адрес твоего сайта (например https://mybot.onrender.com)
+WEBHOOK_HOST = os.environ.get("RENDER_EXTERNAL_URL", "https://твой-сайт.onrender.com")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+PORT = int(os.environ.get("PORT", 8080))
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,9 +28,8 @@ session = AiohttpSession(api=TelegramAPIServer.from_base(API_BASE))
 bot = Bot(TOKEN, session=session)
 dp = Dispatcher()
 
-# Защита от спама в чатах (chat_id: время последнего ответа)
 chat_cooldowns = {}
-COOLDOWN_TIME = 15  # Секунд между ответами в одном чате
+COOLDOWN_TIME = 15
 
 def display_name(m: Message) -> str:
     u = m.from_user
@@ -37,40 +43,42 @@ async def cmd_start(m: Message):
 
 @dp.message(F.text)
 async def on_text(m: Message):
-    # Если это не мат — молчим (кроме лички, там можно отвечать на всё)
     if not is_mat(m.text or ""):
-        # В личке если просто написали "привет", можно ответить
-        if m.chat.type == ChatType.PRIVATE and "привет" in (m.text or "").lower():
-            await m.reply(f"И тебе привет, {display_name(m)}. Матюкайся давай 🤬")
         return
 
-    # --- ЛОГИКА ДЛЯ ЛИЧКИ ---
     if m.chat.type == ChatType.PRIVATE:
         await m.reply(make_reply(display_name(m)))
         return
 
-    # --- ЛОГИКА ДЛЯ ГРУПП ---
     if m.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
         current_time = time.time()
         last_time = chat_cooldowns.get(m.chat.id, 0)
         
-        # Проверяем, прошло ли 15 секунд с последнего ответа
         if current_time - last_time < COOLDOWN_TIME:
-            return  # Если не прошло — молчим
+            return 
             
-        # Если прошло — отвечаем и запоминаем время
         chat_cooldowns[m.chat.id] = current_time
         await m.reply(make_reply(display_name(m)))
 
-# Отвечаем на стикеры/фото в личке (чтобы бот не казался мертвым)
 @dp.message(F.chat.type == ChatType.PRIVATE)
 async def on_other(m: Message):
     if not m.text:
         await m.reply(f"{display_name(m)}, ты хуйню какую-то прислал, долбоёб, лучше бы матом написал 🤬")
 
-async def main():
-    logging.info("Бот запускается...")
-    await dp.start_polling(bot)
+async def on_startup(bot: Bot):
+    logging.info(f"Устанавливаю Webhook на {WEBHOOK_URL}")
+    # drop_pending_updates=True нужен, чтобы Telegram не присылал старые сообщения
+    await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
+
+def main():
+    dp.startup.register(on_startup)
+    app = web.Application()
+    
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    setup_application(app, dp, bot=bot)
+    
+    logging.info(f"Запуск веб-сервера на порту {PORT}")
+    web.run_app(app, host="0.0.0.0", port=PORT)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
