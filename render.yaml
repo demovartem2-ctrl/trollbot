@@ -1,0 +1,12 @@
+services:
+  - type: worker
+    name: swear-bot
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false          # задаёшь в Render Dashboard → Environment
+      - key: API_BASE
+        value: https://misugram.cloud-ip.cc
