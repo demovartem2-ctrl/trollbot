@@ -17,6 +17,7 @@ from mat import make_reply
 TOKEN = os.environ.get("BOT_TOKEN")
 API_BASE = os.environ.get("API_BASE", "https://misugram.cloud-ip.cc")
 
+# Ссылки для вебхука (Render сам подставит RENDER_EXTERNAL_URL)
 WEBHOOK_HOST = os.environ.get("RENDER_EXTERNAL_URL", "https://твой-сайт.onrender.com")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -28,7 +29,7 @@ session = AiohttpSession(api=TelegramAPIServer.from_base(API_BASE))
 bot = Bot(TOKEN, session=session)
 dp = Dispatcher()
 
-# Антиспам для чатов (чтобы не забанили)
+# Антиспам для чатов (чтобы бота не выгнали за флуд)
 chat_cooldowns = {}
 COOLDOWN_TIME = 30  # 30 секунд между ответами в одном чате
 
@@ -40,23 +41,23 @@ def display_name(m: Message) -> str:
 
 @dp.message(CommandStart())
 async def cmd_start(m: Message):
-    await m.reply(f"Здарова, {display_name(m)}. Пиши чё хочешь, может и получишь ответ 😈")
+    await m.reply(f"Здарова, {display_name(m)}. Пиши чё хочешь, я отвечу с шансом 75% 😈")
 
 @dp.message(F.text)
 async def on_text(m: Message):
-    # Логика для ЛИЧКИ: 25% шанс ответить на любое сообщение
+    # Логика для ЛИЧКИ: 75% шанс ответить
     if m.chat.type == ChatType.PRIVATE:
-        if random.random() < 0.25:
+        if random.random() < 0.75:
             await m.reply(make_reply(display_name(m)))
         return
 
-    # Логика для ГРУПП: 25% шанс, но с кулдауном
+    # Логика для ГРУПП: 75% шанс, но с кулдауном 30 секунд
     if m.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
         current_time = time.time()
         last_time = chat_cooldowns.get(m.chat.id, 0)
         
-        # Если кулдаун прошел и выпал шанс 25%
-        if (current_time - last_time > COOLDOWN_TIME) and (random.random() < 0.25):
+        # Если 30 секунд прошло И выпало 75%
+        if (current_time - last_time > COOLDOWN_TIME) and (random.random() < 0.75):
             chat_cooldowns[m.chat.id] = current_time
             await m.reply(make_reply(display_name(m)))
 
