@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import time
+import random
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
@@ -11,12 +12,11 @@ from aiogram.enums import ChatType
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 
-from mat import is_mat, make_reply
+from mat import make_reply
 
 TOKEN = os.environ.get("BOT_TOKEN")
 API_BASE = os.environ.get("API_BASE", "https://misugram.cloud-ip.cc")
 
-# Render сам подставляет сюда адрес твоего сайта
 WEBHOOK_HOST = os.environ.get("RENDER_EXTERNAL_URL", "https://твой-сайт.onrender.com")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -28,9 +28,9 @@ session = AiohttpSession(api=TelegramAPIServer.from_base(API_BASE))
 bot = Bot(TOKEN, session=session)
 dp = Dispatcher()
 
-# Антиспам для чатов
+# Антиспам для чатов (чтобы не забанили)
 chat_cooldowns = {}
-COOLDOWN_TIME = 15
+COOLDOWN_TIME = 30  # 30 секунд между ответами в одном чате
 
 def display_name(m: Message) -> str:
     u = m.from_user
@@ -40,33 +40,25 @@ def display_name(m: Message) -> str:
 
 @dp.message(CommandStart())
 async def cmd_start(m: Message):
-    await m.reply(f"Здарова, {display_name(m)}. Матюкайся — отвечу 😈")
+    await m.reply(f"Здарова, {display_name(m)}. Пиши чё хочешь, может и получишь ответ 😈")
 
 @dp.message(F.text)
 async def on_text(m: Message):
-    if not is_mat(m.text or ""):
-        return
-
-    # В личке отвечаем всегда
+    # Логика для ЛИЧКИ: 25% шанс ответить на любое сообщение
     if m.chat.type == ChatType.PRIVATE:
-        await m.reply(make_reply(display_name(m)))
+        if random.random() < 0.25:
+            await m.reply(make_reply(display_name(m)))
         return
 
-    # В группах отвечаем, но с кулдауном
+    # Логика для ГРУПП: 25% шанс, но с кулдауном
     if m.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
         current_time = time.time()
         last_time = chat_cooldowns.get(m.chat.id, 0)
         
-        if current_time - last_time < COOLDOWN_TIME:
-            return 
-            
-        chat_cooldowns[m.chat.id] = current_time
-        await m.reply(make_reply(display_name(m)))
-
-@dp.message(F.chat.type == ChatType.PRIVATE)
-async def on_other(m: Message):
-    if not m.text:
-        await m.reply(f"{display_name(m)}, ты хуйню какую-то прислал, долбоёб, лучше бы матом написал 🤬")
+        # Если кулдаун прошел и выпал шанс 25%
+        if (current_time - last_time > COOLDOWN_TIME) and (random.random() < 0.25):
+            chat_cooldowns[m.chat.id] = current_time
+            await m.reply(make_reply(display_name(m)))
 
 async def on_startup(bot: Bot):
     logging.info(f"Устанавливаю Webhook на {WEBHOOK_URL}")
