@@ -16,7 +16,7 @@ from mat import is_mat, make_reply
 TOKEN = os.environ.get("BOT_TOKEN")
 API_BASE = os.environ.get("API_BASE", "https://misugram.cloud-ip.cc")
 
-# Render сам подставляет сюда адрес твоего сайта (например https://mybot.onrender.com)
+# Render сам подставляет сюда адрес твоего сайта
 WEBHOOK_HOST = os.environ.get("RENDER_EXTERNAL_URL", "https://твой-сайт.onrender.com")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -28,6 +28,7 @@ session = AiohttpSession(api=TelegramAPIServer.from_base(API_BASE))
 bot = Bot(TOKEN, session=session)
 dp = Dispatcher()
 
+# Антиспам для чатов
 chat_cooldowns = {}
 COOLDOWN_TIME = 15
 
@@ -46,10 +47,12 @@ async def on_text(m: Message):
     if not is_mat(m.text or ""):
         return
 
+    # В личке отвечаем всегда
     if m.chat.type == ChatType.PRIVATE:
         await m.reply(make_reply(display_name(m)))
         return
 
+    # В группах отвечаем, но с кулдауном
     if m.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
         current_time = time.time()
         last_time = chat_cooldowns.get(m.chat.id, 0)
@@ -67,7 +70,6 @@ async def on_other(m: Message):
 
 async def on_startup(bot: Bot):
     logging.info(f"Устанавливаю Webhook на {WEBHOOK_URL}")
-    # drop_pending_updates=True нужен, чтобы Telegram не присылал старые сообщения
     await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
 
 def main():
